@@ -26,39 +26,37 @@ on:
           - resume
 
 jobs:
-  run-scheduled:
-    if: github.event_name == 'schedule'
+  pause:
+    if: github.event_name == 'schedule' && github.event.schedule == '59 6 * * 1-5'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine action from cron time
-        id: which_action
-        run: |
-          HOUR=$(date -u +%H)
-          MINUTE=$(date -u +%M)
-          if [ "$HOUR" = "20" ]; then
-            echo "action=resume" >> $GITHUB_OUTPUT
-          elif [ "$HOUR" = "06" ] && [ "$MINUTE" = "59" ]; then
-            echo "action=pause" >> $GITHUB_OUTPUT
-          else
-            echo "ERROR: unexpected trigger time ${HOUR}:${MINUTE} UTC"
-            exit 1
-          fi
-
-      - name: Run campaign control
+      - uses: actions/checkout@v4.2.2
+      - name: Pause campaign
         env:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
           EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
-        run: python3 campaign_control.py ${{ steps.which_action.outputs.action }}
+        run: python3 campaign_control.py pause
+
+  resume:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 20 * * 1-5'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Resume campaign
+        env:
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+        run: python3 campaign_control.py resume
 
   run-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Run campaign control (manual)
         env:
