@@ -12,8 +12,8 @@ on:
   schedule:
     # Resume: Mon–Fri at 20:00 UTC (1:00pm PDT)
     - cron: "0 20 * * 1-5"
-    # Pause: TEMPORARY TEST — fires at 13:54 UTC today only
-    - cron: "54 13 * * *"
+    # Pause: Mon–Fri at 06:59 UTC (11:59pm PDT prior night — skips Sat/Sun UTC)
+    - cron: "59 6 * * 1-5"
   workflow_dispatch:
     inputs:
       action:
@@ -27,11 +27,13 @@ on:
 
 jobs:
   pause:
-    if: github.event_name == 'schedule' && github.event.schedule == '54 13 * * *'
+    if: github.event_name == 'schedule' && github.event.schedule == '59 6 * * 1-5'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+
       - name: Pause campaign
+        id: campaign
         env:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
@@ -39,18 +41,56 @@ jobs:
           EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
         run: python3 campaign_control.py pause
 
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: eBay Campaign Scheduler
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign paused"
+          body: |
+            eBay campaign pause job completed.
+
+            Result: ${{ steps.campaign.outcome }}
+            Time: ${{ github.run_started_at }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   resume:
     if: github.event_name == 'schedule' && github.event.schedule == '0 20 * * 1-5'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+
       - name: Resume campaign
+        id: campaign
         env:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
           EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
         run: python3 campaign_control.py resume
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: eBay Campaign Scheduler
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign resumed"
+          body: |
+            eBay campaign resume job completed.
+
+            Result: ${{ steps.campaign.outcome }}
+            Time: ${{ github.run_started_at }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   run-manual:
     if: github.event_name == 'workflow_dispatch'
@@ -59,9 +99,29 @@ jobs:
       - uses: actions/checkout@v4.2.2
 
       - name: Run campaign control (manual)
+        id: campaign
         env:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
           EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
         run: python3 campaign_control.py ${{ github.event.inputs.action }}
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: eBay Campaign Scheduler
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Manual ${{ github.event.inputs.action }}"
+          body: |
+            eBay campaign manual override completed.
+
+            Action: ${{ github.event.inputs.action }}
+            Result: ${{ steps.campaign.outcome }}
+            Time: ${{ github.run_started_at }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
