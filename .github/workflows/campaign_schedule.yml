@@ -1,0 +1,69 @@
+name: eBay Campaign Scheduler
+
+# Times are UTC. Pacific offsets:
+#   PDT (Mar–Nov): UTC-7  → these times are exact
+#   PST (Nov–Mar): UTC-8  → these run 1 hour late; update offsets seasonally if needed
+#
+# Resume schedule: Mon–Fri at 1:00pm PT  → 20:00 UTC Mon–Fri
+# Pause schedule:  Mon–Thu + Sun at 11:59pm PT → 06:59 UTC Tue–Fri + Mon
+#                  (Friday and Saturday nights: no pause — campaign runs all weekend)
+
+on:
+  schedule:
+    # Resume: Mon–Fri at 20:00 UTC (1:00pm PDT)
+    - cron: "0 20 * * 1-5"
+    # Pause: Mon–Fri at 06:59 UTC (11:59pm PDT prior night — skips Sat/Sun UTC)
+    - cron: "59 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Manual override: pause or resume"
+        required: true
+        default: "resume"
+        type: choice
+        options:
+          - pause
+          - resume
+
+jobs:
+  run-scheduled:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine action from cron time
+        id: which_action
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          if [ "$HOUR" = "20" ]; then
+            echo "action=resume" >> $GITHUB_OUTPUT
+          elif [ "$HOUR" = "06" ] && [ "$MINUTE" = "59" ]; then
+            echo "action=pause" >> $GITHUB_OUTPUT
+          else
+            echo "ERROR: unexpected trigger time ${HOUR}:${MINUTE} UTC"
+            exit 1
+          fi
+
+      - name: Run campaign control
+        env:
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+        run: python3 campaign_control.py ${{ steps.which_action.outputs.action }}
+
+  run-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run campaign control (manual)
+        env:
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_REFRESH_TOKEN: ${{ secrets.EBAY_REFRESH_TOKEN }}
+          EBAY_CAMPAIGN_ID: ${{ secrets.EBAY_CAMPAIGN_ID }}
+        run: python3 campaign_control.py ${{ github.event.inputs.action }}
