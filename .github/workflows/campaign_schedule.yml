@@ -12,8 +12,8 @@ on:
   schedule:
     # Resume: Mon–Fri at 20:00 UTC (1:00pm PDT)
     - cron: "0 20 * * 1-5"
-    # Pause: Mon–Fri at 06:59 UTC (11:59pm PDT prior night — skips Sat/Sun UTC)
-    - cron: "59 6 * * 1-5"
+    # Pause: Mon–Fri at 07:30 UTC (12:30am PDT — skips Sat/Sun UTC)
+    - cron: "30 7 * * 1-5"
   workflow_dispatch:
     inputs:
       action:
@@ -27,10 +27,15 @@ on:
 
 jobs:
   pause:
-    if: github.event_name == 'schedule' && github.event.schedule == '59 6 * * 1-5'
+    if: github.event_name == 'schedule' && github.event.schedule == '30 7 * * 1-5'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+
+      - name: Get timestamp
+        id: ts
+        if: always()
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
 
       - name: Pause campaign
         id: campaign
@@ -51,7 +56,7 @@ jobs:
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
           to: ${{ secrets.GMAIL_ADDRESS }}
           from: eBay Campaign Scheduler
-          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign paused"
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign paused — ${{ steps.ts.outputs.value }}"
           body: |
             eBay campaign pause job completed.
 
@@ -64,6 +69,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+
+      - name: Get timestamp
+        id: ts
+        if: always()
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
 
       - name: Resume campaign
         id: campaign
@@ -84,7 +94,7 @@ jobs:
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
           to: ${{ secrets.GMAIL_ADDRESS }}
           from: eBay Campaign Scheduler
-          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign resumed"
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Campaign resumed — ${{ steps.ts.outputs.value }}"
           body: |
             eBay campaign resume job completed.
 
@@ -97,6 +107,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
+
+      - name: Get timestamp
+        id: ts
+        if: always()
+        run: echo "value=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
 
       - name: Run campaign control (manual)
         id: campaign
@@ -117,7 +132,7 @@ jobs:
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
           to: ${{ secrets.GMAIL_ADDRESS }}
           from: eBay Campaign Scheduler
-          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Manual ${{ github.event.inputs.action }}"
+          subject: "[${{ steps.campaign.outcome == 'success' && 'SUCCESS' || 'FAILURE' }}] Manual ${{ github.event.inputs.action }} — ${{ steps.ts.outputs.value }}"
           body: |
             eBay campaign manual override completed.
 
