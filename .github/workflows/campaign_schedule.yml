@@ -4,16 +4,16 @@ name: eBay Campaign Scheduler
 #   PDT (Mar–Nov): UTC-7  → these times are exact
 #   PST (Nov–Mar): UTC-8  → these run 1 hour late; update offsets seasonally if needed
 #
+# Pause schedule:  Mon–Fri at 12:30am PT → 07:30 UTC Mon–Fri
 # Resume schedule: Mon–Fri at 1:00pm PT  → 20:00 UTC Mon–Fri
-# Pause schedule:  Mon–Thu + Sun at 11:59pm PT → 06:59 UTC Tue–Fri + Mon
-#                  (Friday and Saturday nights: no pause — campaign runs all weekend)
+# Weekend:         campaign runs Sat–Sun uninterrupted (no Sat/Sun cron)
 
 on:
   schedule:
-    # Resume: Mon–Fri at 20:00 UTC (1:00pm PDT)
-    - cron: "0 20 * * 1-5"
-    # Pause: Mon–Fri at 07:30 UTC (12:30am PDT — skips Sat/Sun UTC)
+    # Pause:  Mon–Fri at 07:30 UTC (12:30am PT)
     - cron: "30 7 * * 1-5"
+    # Resume: Mon–Fri at 20:00 UTC (1:00pm PT)
+    - cron: "0 20 * * 1-5"
   workflow_dispatch:
     inputs:
       action:
